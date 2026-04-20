@@ -1,0 +1,6 @@
+# Virtual Environment
+ikea_env/
+
+# Secrets
+.env
+
