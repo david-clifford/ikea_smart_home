@@ -1,0 +1,6 @@
+Notes for future me:
+
+- Activate the ikea_env virtual environment using the command ```source ikea_env/bin/activate```
+- The .env file includes the token and hub IP address, these should not be shared at all
+- Plug something into my P1 smart plug and run ```python outlets_test.py```
+- Run ```python list_sensors.py``` to see the current sensors and set of temp / RH / CO2 / PM2.5 readings
