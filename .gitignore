@@ -4,3 +4,5 @@ ikea_env/
 # Secrets
 .env
 
+# Future me notes
+README.local
