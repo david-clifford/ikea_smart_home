@@ -2,58 +2,59 @@ import os
 from dotenv import load_dotenv
 from dirigera import Hub
 
-# Load credentials
 load_dotenv()
 token = os.getenv("DIRIGERA_TOKEN")
-hub_ip = os.getenv("DIRIGERA_IP") # Your specific variable
-
-def get_battery_status(devices, category_name):
-    if not devices:
-        return
-        
-    print(f"\n--- {category_name} ---")
-    found_any_battery = False
-    
-    for d in devices:
-        # Newer Matter devices (MYGGBETT/MYGGSPRAY) report battery in attributes
-        battery = getattr(d.attributes, "battery_percentage", None)
-        
-        if battery is not None:
-            found_any_battery = True
-            name = d.attributes.custom_name
-            room = d.room.name if hasattr(d, "room") and d.room else "Unassigned"
-            
-            status = "OK"
-            if battery < 20:
-                status = "LOW!"
-            elif battery < 10:
-                status = "CRITICAL"
-                
-            print(f"{room:<13} | {name:<30} | {battery:>3}% | {status}")
-    
-    if not found_any_battery:
-        print(f"No battery data found for {category_name} (check if devices are offline).")
+hub_ip = os.getenv("DIRIGERA_IP")
 
 def main():
     if not hub_ip or not token:
-        print("Error: DIRIGERA_IP or DIRIGERA_TOKEN not found in .env file.")
+        print("Error: DIRIGERA_IP or DIRIGERA_TOKEN not found.")
         return
 
     try:
         hub = Hub(token=token, ip_address=hub_ip)
-        print(f"Checking IKEA Hub at {hub_ip}...")
+        raw_devices = hub.get("/devices")
         
-        # Pulling the specific categories for MYGGBETT and MYGGSPRAY
-        get_battery_status(hub.get_open_close_sensors(), "Door/Window Sensors (MYGGBETT)")
-        get_battery_status(hub.get_motion_sensors(), "Motion Sensors (MYGGSPRAY)")
-        
-        # Including your other potential battery devices
-        get_battery_status(hub.get_environment_sensors(), "Environment Sensors")
-        get_battery_status(hub.get_controllers(), "Remotes & Controllers")
-        get_battery_status(hub.get_blinds(), "Smart Blinds")
+        unique_physical_devices = {}
+
+        for d in raw_devices:
+            attr = d.get("attributes", {})
+            
+            # 1. Try every possible battery key name found in Dirigera/Matter
+            battery = (
+                attr.get("batteryPercentage") or 
+                attr.get("batteryLevel") or 
+                attr.get("battery")
+            )
+            
+            # 2. Use relationId if it exists, fall back to device id
+            # Some Matter devices use 'id' as the primary anchor
+            u_id = d.get("relationId") or d.get("id")
+
+            if battery is not None:
+                has_room = d.get("room") is not None
+                
+                # Update logic
+                if u_id not in unique_physical_devices or has_room:
+                    unique_physical_devices[u_id] = d
+
+        print(f"--- 🔋 Deep Scan Battery Audit ---")
+        print(f"{'ROOM':<15} | {'NAME':<25} | {'BATT':>4} | {'TYPE'}")
+        print("-" * 80)
+
+        for d in unique_physical_devices.values():
+            attr = d.get("attributes", {})
+            room_name = d.get("room", {}).get("name", "Unassigned") if d.get("room") else "Unassigned"
+            name = attr.get("customName", "Unknown")
+            
+            # Re-fetch battery for display
+            battery = attr.get("batteryPercentage") or attr.get("batteryLevel") or attr.get("battery")
+            dev_type = d.get("deviceType")
+            
+            print(f"{room_name:<15} | {name:<25} | {battery:>3}% | {dev_type}")
 
     except Exception as e:
-        print(f"Error connecting to Hub: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
