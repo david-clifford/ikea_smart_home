@@ -2,54 +2,71 @@ import os
 from dotenv import load_dotenv
 from dirigera import Hub
 
-# Load credentials
 load_dotenv()
 token = os.getenv("DIRIGERA_TOKEN")
 hub_ip = os.getenv("DIRIGERA_IP")
 
 def main():
+    if not hub_ip or not token:
+        print("Error: DIRIGERA_IP or DIRIGERA_TOKEN not found.")
+        return
+
     try:
         hub = Hub(token=token, ip_address=hub_ip)
-        print(f"--- Connected to IKEA Hub: {hub_ip} ---")
-
-        sensors = hub.get_environment_sensors()
+        raw_devices = hub.get("/devices")
         
-        if not sensors:
-            print("No environment sensors found.")
-            return
+        merged_sensors = {}
 
-        # Header with 30-space padding for Name
-        header = f"{'DEVICE NAME':<30} | {'TEMP':<8} | {'HUMIDITY':<10} | {'PM2.5':<8} | {'CO2':<8} |"
-        print("\n")
-        print("-" * len(header))
-        print(f"{header}")
-        print("-" * len(header))
+        for d in raw_devices:
+            attr = d.get("attributes", {})
+            # Look for any environmental keys
+            has_env_data = any(k in attr for k in ["currentTemperature", "currentRH", "currentPM25", "currentCO2"])
+            
+            if has_env_data:
+                rel_id = d.get("relationId") or d.get("id")
+                
+                if rel_id not in merged_sensors:
+                    merged_sensors[rel_id] = {
+                        "name": attr.get("customName"),
+                        "temp": None,
+                        "hum": None,
+                        "pm25": None,
+                        "co2": None
+                    }
+                
+                # Prioritize custom names (TH1, AQk) over generic model names
+                current_name = attr.get("customName")
+                if current_name and "TIMMERFLOTTE" not in current_name:
+                    merged_sensors[rel_id]["name"] = current_name
 
-        # This loop MUST be indented under the 'try'
-        for s in sensors:
-            attrs = s.attributes
-            name = attrs.custom_name
-            
-            # Temperature
-            temp = attrs.current_temperature
-            temp_str = f"{round(temp, 1)}°C" if temp is not None else "--"
-            
-            # Humidity
-            rh = attrs.current_r_h
-            rh_str = f"{round(rh, 1)}%" if rh is not None else "--"
-            
-            # PM 2.5
-            pm25 = attrs.current_p_m25
-            pm25_str = f"{round(pm25, 1)}" if pm25 is not None else "--"
+                # Mapping raw API keys to our merged dictionary
+                if attr.get("currentTemperature") is not None:
+                    merged_sensors[rel_id]["temp"] = attr.get("currentTemperature")
+                if attr.get("currentRH") is not None:
+                    merged_sensors[rel_id]["hum"] = attr.get("currentRH")
+                if attr.get("currentPM25") is not None:
+                    merged_sensors[rel_id]["pm25"] = attr.get("currentPM25")
+                if attr.get("currentCO2") is not None:
+                    merged_sensors[rel_id]["co2"] = attr.get("currentCO2")
 
-            # CO2
-            co2 = attrs.current_c_o2
-            co2_str = f"{int(co2)}" if co2 is not None else "--"
-            
-            print(f"{name:<30} | {temp_str:<8} | {rh_str:<10} | {pm25_str:<8} | {co2_str:<8} |")
+        # Table Header
+        header = f"{'DEVICE NAME':<11} | {'TEMP':<8} | {'RH':<4} | {'PM2.5':<5} | {'CO2':<4} |"
+        dashedLine = "-" * len(header)
+        print(dashedLine)
+        print(header)
+        print(dashedLine)
 
-        print("-" * len(header))
-        print("\n")
+        # Print sorted by name (TH1, TH2, etc.)
+        for sensor in sorted(merged_sensors.values(), key=lambda x: x["name"] or "Unknown"):
+            name = sensor["name"] or "Unknown Device"
+            temp = f"{sensor['temp']:.1f}°C" if sensor['temp'] is not None else "--"
+            hum  = f"{sensor['hum']}%" if sensor['hum'] is not None else "--"
+            pm25 = str(sensor['pm25']) if sensor['pm25'] is not None else "--"
+            co2  = str(sensor['co2']) if sensor['co2'] is not None else "--"
+
+            print(f"{name:<11} | {temp:<8} | {hum:<4} | {pm25:<5} | {co2:<4} |")
+
+        print(dashedLine)
 
     except Exception as e:
         print(f"Error: {e}")
