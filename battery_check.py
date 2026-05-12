@@ -1,7 +1,4 @@
-from dotenv import load_dotenv
 from hub import get_hub
-
-load_dotenv()
 
 def main():
 

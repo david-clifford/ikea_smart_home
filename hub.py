@@ -1,5 +1,8 @@
 import os
+from dotenv import load_dotenv
 from dirigera import Hub
+
+load_dotenv()
 
 def get_hub():
     "Connect to DIRIGERA hub using environment variables"
