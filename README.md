@@ -11,6 +11,12 @@ Scripts
  - hub.py - boiler plate functions to connect to the hub, collect battery and sensor values, write to our DB
  - config/ - config files for cron jobs and log rotations. Run ```bash config/install_cron.sh``` whenever those settings need to change
 
+To set up on a fresh machine (or after changes), just:
+```
+bash config/install_cron.sh
+sudo cp config/ikea_smart_home.logrotate /etc/logrotate.d/ikea_smart_home
+```
+
 Ideas / To Do:
  - Read the archive of temperature data stored on the hub
  - Plot that information and make it available elsewhere 
