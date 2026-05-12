@@ -1,18 +1,9 @@
-import os
-from dotenv import load_dotenv
-from dirigera import Hub
-
-load_dotenv()
-token = os.getenv("DIRIGERA_TOKEN")
-hub_ip = os.getenv("DIRIGERA_IP")
+from hub import get_hub
 
 def main():
-    if not hub_ip or not token:
-        print("Error: DIRIGERA_IP or DIRIGERA_TOKEN not found.")
-        return
 
     try:
-        hub = Hub(token=token, ip_address=hub_ip)
+        hub = get_hub()
         raw_devices = hub.get("/devices")
         
         merged_sensors = {}
