@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from dotenv import load_dotenv
 from dirigera import Hub
 from datetime import datetime, timezone
@@ -52,3 +53,16 @@ def collect_sensor_readings(hub):
         for rtype, val in s["readings"].items():
             rows.append((ts, s["name"] or "Unknown", s["room"], rtype, val))
     return rows
+
+def init_db(path="readings.db"):
+    "Create readings table if it doesn't exist"
+    con = sqlite3.connect(path)
+    con.execute("""CREATE TABLE IF NOT EXISTS readings (
+        timestamp TEXT, sensor TEXT, room TEXT, reading_type TEXT, value REAL)""")
+    con.commit()
+    return con
+
+def save_readings(con, rows):
+    "Insert a list of reading tuples into the DB"
+    con.executemany("INSERT INTO readings VALUES (?,?,?,?,?)", rows)
+    con.commit()

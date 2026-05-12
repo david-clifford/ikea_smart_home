@@ -8,3 +8,4 @@ ikea_env/
 README.local
 
 __pycache__
+readings.db
