@@ -1,0 +1,7 @@
+/home/pi/ikea_smart_home/cron.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+}

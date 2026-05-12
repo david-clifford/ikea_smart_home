@@ -1,0 +1,2 @@
+*/15 * * * * cd /home/pi/ikea_smart_home && /home/pi/ikea_smart_home/ikea_env/bin/python3 log_readings.py sensors >> /home/pi/ikea_smart_home/cron.log 2>&1
+0    6 * * * cd /home/pi/ikea_smart_home && /home/pi/ikea_smart_home/ikea_env/bin/python3 log_readings.py battery >> /home/pi/ikea_smart_home/cron.log 2>&1
