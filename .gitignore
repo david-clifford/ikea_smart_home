@@ -6,3 +6,5 @@ ikea_env/
 
 # Future me notes
 README.local
+
+__pycache__
