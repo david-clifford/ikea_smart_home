@@ -9,3 +9,4 @@ README.local
 
 __pycache__
 readings.db
+cron.log

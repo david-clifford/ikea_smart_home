@@ -29,7 +29,7 @@ def collect_battery_readings(hub):
         name = attr.get("customName", "Unknown")
         room = d.get("room", {}).get("name", "Unassigned") if d.get("room") else "Unassigned"
         battery = attr.get("batteryPercentage") or attr.get("batteryLevel")
-        rows.append((ts, name, room, "battery", battery))
+        rows.append((ts, name, room, "battery", round(battery,2)))
     return rows
 
 def collect_sensor_readings(hub):
@@ -51,7 +51,7 @@ def collect_sensor_readings(hub):
     rows = []
     for s in merged.values():
         for rtype, val in s["readings"].items():
-            rows.append((ts, s["name"] or "Unknown", s["room"], rtype, val))
+            rows.append((ts, s["name"] or "Unknown", s["room"], rtype, round(val,2)))
     return rows
 
 def init_db(path="readings.db"):
