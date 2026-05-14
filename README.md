@@ -20,3 +20,18 @@ sudo cp config/ikea_smart_home.logrotate /etc/logrotate.d/ikea_smart_home
 Ideas / To Do:
  - Read the archive of temperature data stored on the hub
  - Plot that information and make it available elsewhere 
+
+Notes:  
+ - Timestamps are recorded in UTC. Per Claude I should stick with UTC rather than recording local time for a few reasons:
+ - *No ambiguity* — local time has a gap and an overlap every year at DST transitions. A 1:30am reading in October could exist twice.
+ - *Easier joins* — if you ever combine this data with other sources (weather APIs, energy data), they'll almost certainly be in UTC.
+ - *Display is separate from storage* — you can always convert to local time when querying or plotting
+
+Example Query:
+```
+python3 -c "
+import sqlite3
+con = sqlite3.connect('readings.db')
+for r in con.execute('SELECT datetime(timestamp, \"localtime\"), sensor, room, reading_type, value FROM readings WHERE reading_type = \"battery\" ORDER BY room, timestamp ASC LIMIT 20'): print(r)
+"
+```
