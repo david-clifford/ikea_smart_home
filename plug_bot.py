@@ -172,10 +172,10 @@ async def battery(update: Update, context: ContextTypes.DEFAULT_TYPE):
             room = d.get("room", {}).get("name", "Unassigned") if d.get("room") else "Unassigned"
             name = attr.get("customName", "Unknown")
             batt = attr.get("batteryPercentage") or attr.get("batteryLevel")
-            status = "OK 👍"
+            status = "OK"
             if batt < 20: status = "LOW ⚠️"
             if batt < 10: status = "CRITICAL ‼️"
-            lines.append(f"<code>{room} | {name} | {batt}% {status}</code>")
+            lines.append(f"<code>{room:<13} | {name:<5} | {batt:>3}% {status}</code>")
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
