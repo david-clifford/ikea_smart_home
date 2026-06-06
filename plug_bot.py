@@ -138,6 +138,47 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     outlet.set_on(outlet_on=False)
     await update.message.reply_text(f"🔴  {outlet_name} OFF")
 
+async def battery(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /battery command — report battery levels for all devices."""
+    if ALLOWED_USER_ID and update.effective_user.id != ALLOWED_USER_ID:
+        await update.message.reply_text("Unauthorized.")
+        return
+
+    raw_devices = hub.get("/devices")
+
+    unique = {}
+    for d in raw_devices:
+        attr = d.get("attributes", {})
+        batt = attr.get("batteryPercentage") or attr.get("batteryLevel")
+        if batt is not None:
+            uid = d.get("relationId") or d.get("id")
+            if uid not in unique or d.get("room"):
+                unique[uid] = d
+
+    if not unique:
+        await update.message.reply_text("No battery-powered devices found.")
+        return
+
+    grouped = {}
+    for d in unique.values():
+        dtype = d.get("deviceType", "Other")
+        grouped.setdefault(dtype, []).append(d)
+
+    lines = []
+    for dtype, devices in sorted(grouped.items()):
+        lines.append(f"\n<b>{dtype.upper()}</b>")
+        for d in sorted(devices, key=lambda x: x.get("room", {}).get("name", "Unassigned")):
+            attr = d.get("attributes", {})
+            room = d.get("room", {}).get("name", "Unassigned") if d.get("room") else "Unassigned"
+            name = attr.get("customName", "Unknown")
+            batt = attr.get("batteryPercentage") or attr.get("batteryLevel")
+            status = "OK 👍"
+            if batt < 20: status = "LOW ⚠️"
+            if batt < 10: status = "CRITICAL ‼️"
+            lines.append(f"<code>{room} | {name} | {batt}% {status}</code>")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -145,6 +186,7 @@ def main():
     app.add_handler(CommandHandler("go", go))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("battery", battery))
 
     print("Bot running...")
     app.run_polling()
