@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from dirigera import Hub
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import sqlite3
 
 # Load credentials
 load_dotenv()
@@ -179,7 +180,40 @@ async def battery(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
+## Alert functionality
+DB_PATH = os.getenv("READINGS_DB", "readings.db")
+ALERT_THRESHOLDS = {"co2": 1000, "pm25": 15}
 
+# Track rooms already alerted so we don't repeat
+alerted: dict[str, float] = {}
+
+async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
+    """Periodic check of sensor readings against thresholds."""
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("""
+        SELECT room, reading_type, value
+        FROM readings
+        WHERE reading_type IN ('co2', 'pm25')
+        AND timestamp = (
+            SELECT MAX(timestamp) FROM readings
+            WHERE reading_type IN ('co2', 'pm25')
+        )
+    """).fetchall()
+    con.close()
+
+    for room, rtype, value in rows:
+        key = f"{room}:{rtype}"
+        threshold = ALERT_THRESHOLDS[rtype]
+        if value > threshold and key not in alerted:
+            unit = "ppm" if rtype == "co2" else ""
+            await context.bot.send_message(
+                chat_id=ALLOWED_USER_ID,
+                text=f"🚨 {room} — {rtype.upper()} is {value}{unit} (threshold: {threshold})"
+            )
+            alerted[key] = value
+        elif value <= threshold and key in alerted:
+            del alerted[key]
+            
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -187,6 +221,9 @@ def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("battery", battery))
+
+    job_queue = app.job_queue
+    job_queue.run_repeating(check_alerts, interval=900, first=900)
 
     print("Bot running...")
     app.run_polling()
