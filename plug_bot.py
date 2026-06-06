@@ -175,7 +175,7 @@ async def battery(update: Update, context: ContextTypes.DEFAULT_TYPE):
             status = "OK"
             if batt < 20: status = "LOW ⚠️"
             if batt < 10: status = "CRITICAL ‼️"
-            lines.append(f"<code>{room:<13} | {name:<5} | {batt:>3}% {status}</code>")
+            lines.append(f"<code>{room:<12} | {name:<3} | {batt:>3}% {status}</code>")
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
