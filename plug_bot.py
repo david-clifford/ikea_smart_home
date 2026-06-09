@@ -7,6 +7,13 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import sqlite3
 
+# For plotting via /plot
+import io, matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
+
 # Load credentials
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -215,7 +222,41 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
             alerted[key] = value
         elif value <= threshold and key in alerted:
             del alerted[key]
-            
+
+def group_rows(rows):
+    "Group reading rows into {label: ([times],[vals])}"
+    g = defaultdict(lambda: ([],[]))
+    for ts,room,sensor,val in rows:
+        t = datetime.fromisoformat(ts)
+        g[f"{room} ({sensor})"][0].append(t)
+        g[f"{room} ({sensor})"][1].append(val)
+    return g
+
+def make_plot(rows, rtype, dur):
+    "Render readings to an in-memory PNG buffer"
+    g = group_rows(rows)
+    fig,ax = plt.subplots(figsize=(8,4))
+    for label,(ts,vals) in g.items(): ax.plot(ts, vals, marker='.', label=label)
+    ax.set_title(f"{rtype} (last {dur})"); ax.set_xlabel("time"); ax.set_ylabel(rtype); ax.legend(fontsize=7)
+    fig.autofmt_xdate(); fig.tight_layout()
+    buf = io.BytesIO(); fig.savefig(buf, format='png', dpi=100); buf.seek(0); plt.close(fig)
+    return buf
+
+async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    "Handle /plot <reading_type> <duration> command."
+    if ALLOWED_USER_ID and update.effective_user.id != ALLOWED_USER_ID: return await update.message.reply_text("Unauthorized.")
+    args = context.args
+    if len(args) < 2: return await update.message.reply_text("Usage: /plot <reading_type> <duration>\nExample: /plot pm25 6h")
+    rtype,dur = args[0],args[1]
+    seconds = parse_duration(dur)
+    if seconds is None: return await update.message.reply_text(f"Couldn't parse duration: '{dur}'")
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("SELECT timestamp,room,sensor,value FROM readings WHERE reading_type=? AND timestamp>=? ORDER BY timestamp ASC", (rtype,cutoff)).fetchall()
+    con.close()
+    if not rows: return await update.message.reply_text(f"No {rtype} readings in last {dur}")
+    await update.message.reply_photo(make_plot(rows, rtype, dur))
+
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -223,6 +264,7 @@ def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(CommandHandler("battery", battery))
+    app.add_handler(CommandHandler("plot", plot))
 
     job_queue = app.job_queue
     job_queue.run_repeating(check_alerts, interval=900, first=900)
