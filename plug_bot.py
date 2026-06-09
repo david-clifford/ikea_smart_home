@@ -23,13 +23,15 @@ active_timers: dict[str, asyncio.Task] = {}
 def parse_duration(text: str) -> int | None:
     """Parse duration string like '30m', '2h', '1h30m' into seconds."""
     total = 0
-    matches = re.findall(r'(\d+)\s*(h|m|s)', text.lower())
+    matches = re.findall(r'(\d+)\s*(d|h|m|s)', text.lower())
     if not matches:
         return None
     for value, unit in matches:
         value = int(value)
-        if unit == 'h':
-            total += value * 3600
+        if unit == 'd':
+            total += value * 60*60*24
+        elif unit == 'h':
+            total += value * 60*60
         elif unit == 'm':
             total += value * 60
         elif unit == 's':
