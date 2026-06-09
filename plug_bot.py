@@ -8,11 +8,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import sqlite3
 
 # For plotting via /plot
-import io, matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+import httpx
+QUICKCHART_URL = os.getenv("QUICKCHART_URL", "http://178.104.4.177:3400/chart")
 
 # Load credentials
 load_dotenv()
@@ -232,15 +231,12 @@ def group_rows(rows):
         g[f"{room} ({sensor})"][1].append(val)
     return g
 
-def make_plot(rows, rtype, dur):
-    "Render readings to an in-memory PNG buffer"
+def build_chart(rows, rtype, dur):
+    "Build a QuickChart line-chart config from reading rows"
     g = group_rows(rows)
-    fig,ax = plt.subplots(figsize=(8,4))
-    for label,(ts,vals) in g.items(): ax.plot(ts, vals, marker='.', label=label)
-    ax.set_title(f"{rtype} (last {dur})"); ax.set_xlabel("time"); ax.set_ylabel(rtype); ax.legend(fontsize=7)
-    fig.autofmt_xdate(); fig.tight_layout()
-    buf = io.BytesIO(); fig.savefig(buf, format='png', dpi=100); buf.seek(0); plt.close(fig)
-    return buf
+    datasets = [dict(label=label, data=[dict(x=t.isoformat(), y=v) for t,v in zip(ts,vals)], fill=False) for label,(ts,vals) in g.items()]
+    opts = dict(title=dict(display=True, text=f"{rtype} (last {dur})"), scales=dict(xAxes=[dict(type='time')]))
+    return dict(type='line', data=dict(datasets=datasets), options=opts)
 
 async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     "Handle /plot <reading_type> <duration> command."
@@ -255,7 +251,8 @@ async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rows = con.execute("SELECT timestamp,room,sensor,value FROM readings WHERE reading_type=? AND timestamp>=? ORDER BY timestamp ASC", (rtype,cutoff)).fetchall()
     con.close()
     if not rows: return await update.message.reply_text(f"No {rtype} readings in last {dur}")
-    await update.message.reply_photo(make_plot(rows, rtype, dur))
+    async with httpx.AsyncClient() as client: r = await client.post(QUICKCHART_URL, json=dict(chart=build_chart(rows, rtype, dur)), timeout=30)
+    await update.message.reply_photo(r.content)
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
