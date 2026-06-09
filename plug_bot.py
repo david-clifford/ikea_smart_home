@@ -235,8 +235,10 @@ def build_chart(rows, rtype, dur):
     "Build a QuickChart line-chart config from reading rows"
     g = group_rows(rows)
     datasets = [dict(label=label, data=[dict(x=t.isoformat(), y=v) for t,v in zip(ts,vals)], fill=False) for label,(ts,vals) in g.items()]
-    opts = dict(title=dict(display=True, text=f"{rtype} (last {dur})"), scales=dict(xAxes=[dict(type='time')]))
+    legend = dict(labels=dict(fontSize=9, boxWidth=18, padding=4))
+    opts = dict(title=dict(display=True, text=f"{rtype} (last {dur})"), legend=legend, scales=dict(xAxes=[dict(type='time')]))
     return dict(type='line', data=dict(datasets=datasets), options=opts)
+
 
 async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     "Handle /plot <reading_type> <duration> command."
@@ -251,7 +253,7 @@ async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rows = con.execute("SELECT timestamp,room,sensor,value FROM readings WHERE reading_type=? AND timestamp>=? ORDER BY timestamp ASC", (rtype,cutoff)).fetchall()
     con.close()
     if not rows: return await update.message.reply_text(f"No {rtype} readings in last {dur}")
-    async with httpx.AsyncClient() as client: r = await client.post(QUICKCHART_URL, json=dict(chart=build_chart(rows, rtype, dur)), timeout=30)
+    async with httpx.AsyncClient() as client: r = await client.post(QUICKCHART_URL, json=dict(chart=build_chart(rows, rtype, dur), width=600, height=800), timeout=30)
     await update.message.reply_photo(r.content)
 
 def main():
