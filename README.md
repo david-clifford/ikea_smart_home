@@ -1,8 +1,16 @@
+CURRENT STATUS - I ended up returning the system of sensors to IKEA due to persistent network crashes requiring setting everything up from scratch sensor by sensor. Adding sensors one by one, each one requiring several attempts via their app was a terrible user experience. 
+
 Exploratory project to connect to my DIRIGERA hub, activate a smart plug and read environmental sensor data.
 
 Follow the instructions at https://github.com/Leggin/dirigera#quickstart for how to set up two environment variables
  - DIRIGERA_TOKEN
  - DIRIGERA_IP
+
+Also include environmental variables for communicating with the system via telegram and receiving quickchart images. 
+ - TELEGRAM_BOT_TOKEN
+ - TELEGRAM_USER_ID
+ - QUICKCHART_URL
+
 
 Scripts
  - outlets_test.py - finds my smart outlet, turns it on for 15s, then off. Make sure something like a light / radio is attached to confirm this works
